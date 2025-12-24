@@ -8,22 +8,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* --- THEME VARIABLES --- */
         :root {
             --bg-body: #0f172a;
             --bg-panel: #1e293b;
             --bg-chat-bubble-bot: #334155;
-            --bg-chat-bubble-user: #4f46e5; /* Indigo 600 */
+            --bg-chat-bubble-user: #4f46e5;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --border-color: #334155;
             --accent-glow: rgba(79, 70, 229, 0.15);
             --success: #10b981;
-            
             --font-main: 'Plus Jakarta Sans', sans-serif;
         }
 
-        /* --- RESET & BASE --- */
         * { box-sizing: border-box; outline: none; }
         
         body {
@@ -37,7 +34,6 @@
             background-image: radial-gradient(circle at top right, #1e1b4b, transparent 40%);
         }
 
-        /* --- LAYOUT --- */
         .app-shell {
             display: flex;
             width: 100%;
@@ -47,7 +43,6 @@
             position: relative;
         }
 
-        /* --- SIDEBAR --- */
         .sidebar {
             width: 320px;
             background: var(--bg-panel);
@@ -116,7 +111,6 @@
             border: 1px solid var(--border-color);
         }
 
-        /* --- MAIN CHAT AREA --- */
         .chat-main {
             flex: 1;
             display: flex;
@@ -150,7 +144,11 @@
             box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
         }
 
-        /* Messages */
+        .status-dot.offline {
+            background-color: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+
         .messages-container {
             flex: 1;
             overflow-y: auto;
@@ -161,7 +159,6 @@
             scroll-behavior: smooth;
         }
         
-        /* Custom Scrollbar */
         .messages-container::-webkit-scrollbar { width: 6px; }
         .messages-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
 
@@ -220,11 +217,10 @@
         .bot .bubble {
             border-top-left-radius: 2px;
             border: 1px solid var(--border-color);
-            background: rgba(30, 41, 59, 0.7); /* slight transparency */
+            background: rgba(30, 41, 59, 0.7);
             backdrop-filter: blur(5px);
         }
 
-        /* Input Area */
         .input-wrapper {
             padding: 24px 32px;
             background: var(--bg-body);
@@ -282,7 +278,6 @@
         .send-btn:hover { background: #4f46e5; transform: translateY(-1px); }
         .send-btn:disabled { background: #334155; cursor: not-allowed; transform: none; }
 
-        /* --- TOAST NOTIFICATIONS --- */
         .toast-container {
             position: fixed;
             top: 24px;
@@ -316,7 +311,6 @@
         .toast.error { border-left: 4px solid #ef4444; }
         .toast.loading { border-left: 4px solid #f59e0b; }
 
-        /* Typing Animation */
         .dots span {
             width: 5px; height: 5px; background: #94a3b8; border-radius: 50%; display: inline-block;
             animation: bounce 1.4s infinite;
@@ -325,7 +319,6 @@
         .dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
-        /* Mobile */
         @media (max-width: 768px) {
             .app-shell { flex-direction: column; }
             .sidebar { width: 100%; padding: 16px; height: auto; border-bottom: 1px solid var(--border-color); }
@@ -369,7 +362,10 @@
                     <h2>Workspace</h2>
                     <span style="font-size: 12px; color: #64748b;">AI Assistant connected via n8n</span>
                 </div>
-                <div><span class="status-dot"></span><span style="font-size: 12px; color: #94a3b8;">Online</span></div>
+                <div>
+                    <span class="status-dot" id="statusDot"></span>
+                    <span style="font-size: 12px; color: #94a3b8;" id="statusText">Checking...</span>
+                </div>
             </header>
 
             <div class="messages-container" id="chatHistory">
@@ -404,7 +400,29 @@
         // UI Init
         document.getElementById('sessionDisplay').innerText = sessionId;
 
-        // --- 1. File Upload Logic ---
+        // Health Check
+        async function checkBackendHealth() {
+            try {
+                const response = await fetch(UPLOAD_WEBHOOK_URL, {
+                    method: 'OPTIONS',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                document.getElementById('statusDot').classList.remove('offline');
+                document.getElementById('statusText').innerText = 'Online';
+                return true;
+            } catch (error) {
+                document.getElementById('statusDot').classList.add('offline');
+                document.getElementById('statusText').innerText = 'Backend Offline';
+                console.warn('Backend health check failed:', error);
+                return false;
+            }
+        }
+
+        // Check on load (with retry for Render spin-up)
+        setTimeout(checkBackendHealth, 500);
+
+        // File Upload Logic
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
 
@@ -439,26 +457,74 @@
             formData.append('data', file);
 
             try {
+                console.log('Uploading to:', UPLOAD_WEBHOOK_URL);
+                
                 const response = await fetch(UPLOAD_WEBHOOK_URL, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    // Don't set Content-Type - browser sets it with boundary
                 });
                 
-                if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
                 
-                const result = await response.json();
-                currentFileId = result.file_id || file.name.replace(/\s/g, '_');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server error response:', errorText);
+                    throw new Error(`Server Error ${response.status}: ${errorText.substring(0, 100)}`);
+                }
+                
+                // Get raw text first
+                const responseText = await response.text();
+                console.log('Response body:', responseText);
+                
+                // Check if response is empty
+                if (!responseText || responseText.trim() === '') {
+                    console.warn('Empty response - using filename as fallback');
+                    // Fallback: use filename as file_id
+                    currentFileId = file.name.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+                    
+                    document.getElementById('fileDisplay').innerText = file.name;
+                    showToast('success', 'Document uploaded (using fallback ID)');
+                    addMessage("bot", `File **${file.name}** uploaded. Note: Server didn't return a file_id, using filename as identifier.`);
+                    return; // Exit early
+                }
+                
+                // Try to parse JSON
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (jsonError) {
+                    console.error('JSON parse error:', jsonError);
+                    console.warn('Using filename as fallback');
+                    currentFileId = file.name.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+                    
+                    document.getElementById('fileDisplay').innerText = file.name;
+                    showToast('success', 'Document uploaded (using fallback ID)');
+                    addMessage("bot", `File **${file.name}** uploaded. Note: Server returned non-JSON response.`);
+                    return; // Exit early
+                }
+                
+                currentFileId = result.file_id || result.fileId || file.name.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
                 
                 document.getElementById('fileDisplay').innerText = file.name;
                 showToast('success', 'Document indexed successfully!');
                 addMessage("bot", `I've analyzed **${file.name}**. I'm ready for your questions.`);
+                
             } catch (error) {
-                console.error(error);
-                showToast('error', 'Upload failed. ' + error.message);
+                console.error('Upload error:', error);
+                
+                let errorMsg = error.message;
+                if (error.message.includes('Failed to fetch')) {
+                    errorMsg = 'Cannot connect to backend. Your Render instance may be spinning up (can take 30-60 seconds on free tier).';
+                }
+                
+                showToast('error', 'Upload failed');
+                addMessage("bot", `⚠️ **Upload Error**: ${errorMsg}`);
             }
         }
 
-        // --- 2. Chat Logic (FIXED) ---
+        // Chat Logic
         const userInput = document.getElementById('userInput');
         let isSending = false;
 
@@ -482,22 +548,24 @@
             isSending = true;
             toggleInputState(true);
 
-            // 1. Reset Input
             userInput.value = '';
             userInput.style.height = 'auto';
             addMessage("user", text);
             
-            // 2. Add Loading Animation
             const loadingId = addMessage("bot", '<div class="dots"><span></span><span></span><span></span></div>');
 
             try {
-                // 3. Setup AbortController for Timeout (60 seconds)
+                console.log('Sending message to:', CHAT_WEBHOOK_URL);
+                
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000); 
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
 
                 const response = await fetch(CHAT_WEBHOOK_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify({
                         message: text,
                         sessionId: sessionId,
@@ -506,35 +574,46 @@
                     signal: controller.signal
                 });
 
-                clearTimeout(timeoutId); // Clear timeout if successful
+                clearTimeout(timeoutId);
 
-                // 4. Check for HTTP Errors (404, 500, etc.)
+                console.log('Chat response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error(`Server returned status ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('Chat error response:', errorText);
+                    throw new Error(`Server Error ${response.status}`);
                 }
 
-                // 5. Safe JSON Parsing
                 const responseText = await response.text();
+                console.log('Chat response:', responseText);
+                
+                if (!responseText || responseText.trim() === '') {
+                    throw new Error('Empty response from server');
+                }
+                
                 let data;
                 try {
                     data = JSON.parse(responseText);
                 } catch (e) {
-                    throw new Error("Received invalid JSON from server");
+                    throw new Error(`Invalid JSON: ${responseText.substring(0, 100)}`);
                 }
                 
-                // 6. Extract Output
-                const botReply = data.output || data.text || data.message || JSON.stringify(data);
-                
-                // 7. Update UI
+                const botReply = data.output || data.text || data.message || data.response || JSON.stringify(data);
                 updateMessage(loadingId, botReply);
 
             } catch (error) {
                 console.error("Chat Error:", error);
                 
                 let errorMsg = "⚠️ Something went wrong.";
-                if (error.name === 'AbortError') errorMsg = "⚠️ Request timed out (took too long).";
-                else if (error.message.includes('JSON')) errorMsg = "⚠️ Server returned invalid data.";
-                else errorMsg = `⚠️ Error: ${error.message}`;
+                if (error.name === 'AbortError') {
+                    errorMsg = "⚠️ Request timed out. Your n8n workflow may be taking too long to respond.";
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMsg = "⚠️ Cannot connect to backend. Check if your Render instance is running.";
+                } else if (error.message.includes('Empty response')) {
+                    errorMsg = "⚠️ Server returned empty response. Check your n8n workflow's 'Respond to Webhook' node.";
+                } else {
+                    errorMsg = `⚠️ Error: ${error.message}`;
+                }
 
                 updateMessage(loadingId, errorMsg);
                 showToast('error', 'Message failed');
@@ -545,12 +624,10 @@
             }
         }
 
-        // --- Helper Functions ---
-
         function addMessage(sender, text) {
             const history = document.getElementById('chatHistory');
             const msgDiv = document.createElement('div');
-            const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`; // More unique ID
+            const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             msgDiv.className = `message ${sender}`;
             msgDiv.id = id;
 
@@ -575,11 +652,9 @@
             const el = document.getElementById(id);
             if (el) {
                 const bubble = el.querySelector('.bubble');
-                // Force replace content to remove animation
                 bubble.innerHTML = formatText(newText);
             } else {
                 console.warn("Could not find message ID to update:", id);
-                // Fallback if ID not found: add new message
                 addMessage('bot', newText);
             }
         }
