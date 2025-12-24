@@ -398,6 +398,10 @@
         const CHAT_WEBHOOK_URL = 'https://rag-system-n8n.onrender.com/webhook/chat-endpoint';
         // =================================================
 
+        function setStatus(text, color = '#94a3b8') {
+            showToast('loading', text);
+        }
+
         let currentFileId = null;
         const sessionId = 'sess_' + Math.random().toString(36).substr(2, 6);
         
