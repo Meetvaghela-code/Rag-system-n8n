@@ -504,7 +504,7 @@
             const text = input.value.trim();
             if (!text) return;
             input.value = '';
-            toggleSend(true);
+            toggleInputState(true);
 
             if (isSending) return;
             isSending = true;
