@@ -437,7 +437,7 @@
         });
 
     async function handleFileUpload(file) {
-      setStatus(`Uploading ${file.name}...`, varColor('text'));
+      setStatus(`Uploading ${file.name}...`);
       toggleSend(true);
 
       const formData = new FormData();
