@@ -432,31 +432,47 @@
             if (e.target.files.length) handleFileUpload(e.target.files[0]);
         });
 
-        async function handleFileUpload(file) {
-            showToast('loading', `Uploading ${file.name}...`);
-            
-            const formData = new FormData();
-            formData.append('data', file);
+        async function handleUpload(file) {
+      setStatus(`Uploading ${file.name}...`, varColor('text'));
+      toggleSend(true);
 
-            try {
-                const response = await fetch(UPLOAD_WEBHOOK_URL, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) throw new Error(`Server Error: ${response.status}`);
-                
-                const result = await response.json();
-                currentFileId = result.file_id || file.name.replace(/\s/g, '_');
-                
-                document.getElementById('fileDisplay').innerText = file.name;
-                showToast('success', 'Document indexed successfully!');
-                addMessage("bot", `I've analyzed **${file.name}**. I'm ready for your questions.`);
-            } catch (error) {
-                console.error(error);
-                showToast('error', 'Upload failed. ' + error.message);
-            }
+      const formData = new FormData();
+      formData.append('data', file);
+
+      try {
+        const res = await fetch(UPLOAD_WEBHOOK_URL, { 
+          method: 'POST', 
+          body: formData,
+          mode: 'cors'
+        });
+        
+        // Check HTTP status first
+        if (!res.ok) throw new Error(`Upload failed (${res.status}) - ${res.statusText}`);
+        
+        // Get response text
+        const text = await res.text();
+        console.log('Raw response:', text);
+        
+        // Parse JSON only if response has content
+        let result = {};
+        if (text && text.trim()) {
+          result = JSON.parse(text);
+        } else {
+          // Handle empty response - assume success if HTTP 200
+          result = { file_id: file.name.replace(/\s/g, '_') };
         }
+        
+        currentFileId = result.file_id || file.name.replace(/\s/g, '_');
+        setStatus('✓ Document indexed', '#22c55e');
+        addMessage('bot', `I've indexed **${file.name}**. Ask me anything about it.`);
+      } catch (err) {
+        console.error('Upload Error:', err);
+        setStatus(`Error: ${err.message}`, '#f87171');
+        addMessage('bot', `Upload failed: ${err.message}`);
+      } finally {
+        toggleSend(false);
+      }
+    }
 
         // --- 2. Chat Logic (FIXED) ---
         const userInput = document.getElementById('userInput');
