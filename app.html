@@ -538,13 +538,26 @@
                 }
 
                 // 5. Safe JSON Parsing
+                // const responseText = await response.text();
+                // let data;
+                // try {
+                //     data = JSON.parse(responseText);
+                // } catch (e) {
+                //     throw new Error("Received invalid JSON from server");
+                // }
                 const responseText = await response.text();
+                console.log("🔴 RAW RESPONSE FROM SERVER ↓↓↓");
+                console.log(responseText);
+                console.log("🔴 END RAW RESPONSE ↑↑↑");
+
                 let data;
                 try {
-                    data = JSON.parse(responseText);
+                data = JSON.parse(responseText);
                 } catch (e) {
-                    throw new Error("Received invalid JSON from server");
+                console.error("❌ JSON PARSE FAILED. RAW RESPONSE WAS:", responseText);
+                throw new Error("Received invalid JSON from server");
                 }
+
                 
                 // 6. Extract Output
                 const botReply = data.output || data.text || data.message || JSON.stringify(data);
