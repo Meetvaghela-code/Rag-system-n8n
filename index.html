@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Agent | Powered by n8n</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- CSS VARIABLES & THEME --- */
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --primary: #6366f1; /* Indigo */
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --accent: #f43f5e; /* n8n Pink/Red */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            
+            --font-main: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        a { text-decoration: none; color: inherit; transition: 0.3s; }
+        ul { list-style: none; }
+
+        /* --- UTILITIES --- */
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 30px var(--primary-glow); }
+        .btn-outline {
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        .btn-outline:hover { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+
+        /* --- HEADER --- */
+        header {
+            padding: 24px 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        nav { display: flex; justify-content: space-between; align-items: center; }
+        
+        .logo { 
+            font-size: 20px; 
+            font-weight: 800; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+        }
+        .logo span { color: var(--accent); } /* n8n color */
+
+        .nav-links { display: flex; gap: 32px; font-weight: 500; font-size: 14px; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* --- HERO SECTION --- */
+        .hero {
+            padding: 180px 0 100px;
+            position: relative;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        /* Background Effects */
+        .bg-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+       .hero h1 {
+    font-size: 64px;
+    line-height: 1.1;
+    font-weight: 800;
+    margin-bottom: 24px;
+    color: #ffffff; /* Solid White */
+}
+
+        .hero p {
+            font-size: 20px;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; }
+
+        /* --- WORKFLOW ANIMATION (The "Interactive Asset") --- */
+        .workflow-viz {
+            margin-top: 80px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .nodes-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            height: 100px;
+        }
+
+        /* Connection Line */
+        .connection-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--border);
+            z-index: 1;
+        }
+
+        /* Moving Data Particle */
+        .data-packet {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+            z-index: 2;
+            transform: translateY(-50%);
+            box-shadow: 0 0 10px var(--accent);
+            animation: flow 3s infinite linear;
+        }
+
+        @keyframes flow {
+            0% { left: 5%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { left: 95%; opacity: 0; }
+        }
+
+        .node {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            transition: 0.3s;
+            position: relative;
+        }
+
+        .node:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        
+        .node i { font-size: 24px; margin-bottom: 8px; color: var(--text-muted); }
+        .node:hover i { color: var(--primary); }
+
+        /* --- FEATURES GRID --- */
+        .features { padding: 100px 0; }
+        
+        .section-header { text-align: center; margin-bottom: 60px; }
+        .section-header h2 { font-size: 36px; margin-bottom: 16px; }
+        .section-header p { color: var(--text-muted); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 32px;
+            border-radius: 16px;
+            transition: 0.3s;
+        }
+
+        .card:hover { border-color: var(--primary); background: rgba(30, 41, 59, 0.8); }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-size: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card h3 { font-size: 20px; margin-bottom: 12px; }
+        .card p { color: var(--text-muted); font-size: 15px; }
+
+        /* --- HOW IT WORKS (Timeline) --- */
+        .steps { padding: 80px 0; position: relative; }
+        .step-item {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 40px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s forwards;
+        }
+
+        .step-item:nth-child(1) { animation-delay: 0.2s; }
+        .step-item:nth-child(2) { animation-delay: 0.4s; }
+        .step-item:nth-child(3) { animation-delay: 0.6s; }
+
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        .step-number {
+            font-size: 48px;
+            font-weight: 800;
+            color: rgba(255,255,255,0.05);
+            line-height: 1;
+        }
+
+        .step-content h3 { font-size: 20px; color: var(--primary); margin-bottom: 8px; }
+        .step-content p { color: var(--text-muted); max-width: 400px; }
+
+        /* --- CTA FOOTER --- */
+        .cta-section {
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-dark) 100%);
+            padding: 80px 0;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 42px; }
+            .nodes-container { flex-direction: column; height: auto; gap: 32px; }
+            .connection-line { width: 2px; height: 100%; left: 50%; top: 0; }
+            .data-packet { left: 50%; animation: flowVertical 3s infinite linear; }
+            @keyframes flowVertical {
+                0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; }
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="color:#f43f5e;">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                    n8n RAG <span>Agent</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#workflow">Workflow</a>
+                </div>
+                <a href="app.html" class="btn btn-outline" style="padding: 8px 16px; font-size:14px;">Try Now</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="bg-glow"></div>
+        <div class="container">
+            <h1>Turn your Documents<br>into Intelligent Conversations.</h1>
+            <p>
+                A powerful RAG (Retrieval-Augmented Generation) system built on 
+                <strong>n8n workflows</strong>. Upload PDFs, ask questions, and get accurate answers instantly.
+            </p>
+            
+            <div class="hero-buttons">
+                <a href="app.html" class="btn btn-primary">
+                    Launch Assistant 
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                <a href="https://n8n.io" target="_blank" class="btn btn-outline">View Workflow</a>
+            </div>
+
+            <div class="workflow-viz">
+                <div class="nodes-container">
+                    <div class="connection-line"></div>
+                    <div class="data-packet"></div>
+
+                    <div class="node">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16c0 1.1.9 2 2 2h12a2 2 0 002-2V8l-6-6z"/></svg>
+                        <span>Upload</span>
+                    </div>
+
+                    <div class="node">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                        <span>Parse</span>
+                    </div>
+
+                    <div class="node">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        <span>Vector DB</span>
+                    </div>
+
+                    <div class="node" style="border-color: var(--accent);">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                        <span>LLM</span>
+                    </div>
+
+                    <div class="node">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        <span>Response</span>
+                    </div>
+                </div>
+                <p style="margin-top:24px; font-size:12px; opacity:0.6;">Visual representation of the backend n8n data pipeline</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Built for Accuracy & Speed</h2>
+                <p>Leveraging the power of vector embeddings and Large Language Models.</p>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-icon">📄</div>
+                    <h3>Document Parsing</h3>
+                    <p>Automatically extracts text from PDFs, CSVs, and TXT files, chunking them for optimal processing.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🧠</div>
+                    <h3>Context Awareness</h3>
+                    <p>Maintains conversation history (session memory) so you can ask follow-up questions naturally.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">⚡</div>
+                    <h3>Real-time Webhooks</h3>
+                    <p>Powered by n8n webhooks for low-latency communication between the UI and the AI backend.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="workflow" class="features" style="background: rgba(30,41,59,0.3);">
+        <div class="container">
+            <div class="grid" style="align-items: center;">
+                <div>
+                    <div class="section-header" style="text-align: left;">
+                        <h2>Simple 3-Step Process</h2>
+                        <p>No complex setup required. Just bring your data.</p>
+                    </div>
+                    
+                    <div class="steps">
+                        <div class="step-item">
+                            <div class="step-number">01</div>
+                            <div class="step-content">
+                                <h3>Upload Data</h3>
+                                <p>Drag and drop your knowledge base files. We securely index them into a Vector Store.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">02</div>
+                            <div class="step-content">
+                                <h3>Ask Questions</h3>
+                                <p>Type your query. The system retrieves relevant chunks of text from your documents.</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">03</div>
+                            <div class="step-content">
+                                <h3>Get Answers</h3>
+                                <p>The LLM synthesizes the retrieved data to provide a precise, fact-based answer.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--bg-card); border:1px solid var(--border); border-radius: 20px; padding: 30px; position:relative;">
+                    <div style="position:absolute; top:-10px; right:-10px; background:var(--accent); color:white; padding:4px 12px; font-size:12px; border-radius:20px; font-weight:bold;">Live Demo</div>
+                    <pre style="color: #94a3b8; font-size: 13px; font-family: monospace;">
+<span style="color:#f43f5e">User:</span> What is the revenue for Q3?
+
+<span style="color:#6366f1">System:</span> Searching 'Q3 Financial Report.pdf'...
+Found 3 relevant references.
+
+<span style="color:#fff">AI:</span> Based on the document, the revenue for Q3 
+was $4.2M, which is a 15% increase from Q2.
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container">
+            <h2 style="font-size:32px; margin-bottom:16px;">Ready to explore your data?</h2>
+            <p style="margin-bottom:32px; color:var(--text-muted);">Open source, secure, and fully customizable via n8n.</p>
+            <a href="app.html" class="btn btn-primary" style="padding: 16px 32px; font-size: 18px;">
+                Start Chatting Now
+            </a>
+        </div>
+    </section>
+
+    <footer style="padding: 40px 0; text-align: center; color: var(--text-muted); font-size: 14px; border-top: 1px solid rgba(255,255,255,0.05);">
+        <p>&copy; 2024 RAG Agent System. Powered by n8n Workflow Automation.</p>
+    </footer>
+
+</body>
+</html>
